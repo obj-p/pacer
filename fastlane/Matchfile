@@ -1,0 +1,6 @@
+git_url(ENV["MATCH_GIT_URL"])
+git_branch("main")
+storage_mode("git")
+type("adhoc")
+app_identifier(["com.objp.Pacer"])
+team_id(ENV["PACER_TEAM_ID"])

@@ -1,23 +1,11 @@
-# Xcode
+.DS_Store
+*.xcodeproj
 xcuserdata/
-*.hmap
-*.ipa
-*.dSYM.zip
-*.dSYM
-timeline.xctimeline
-playground.xcworkspace
-
-# Swift Package Manager
+.swiftpm
 .build/
-
-# CocoaPods
-# Pods/
-
-# Carthage
-Carthage/Build/
-
-# fastlane
+dist/
 fastlane/report.xml
 fastlane/Preview.html
-fastlane/screenshots/**/*.png
 fastlane/test_output
+.env
+vendor/

@@ -1,0 +1,90 @@
+default_platform(:ios)
+
+platform :ios do
+  desc "Sync certificates and profiles using match"
+  lane :sync_certs do
+    match(type: "adhoc", readonly: is_ci)
+  end
+
+  desc "Build ad-hoc IPA"
+  lane :build do
+    sync_certs
+
+    Dir.chdir("..") { sh("xcodegen") }
+
+    gym(
+      scheme: "Pacer",
+      project: "Pacer.xcodeproj",
+      export_method: "ad-hoc",
+      destination: "generic/platform=watchOS",
+      output_directory: "dist",
+      output_name: "Pacer",
+      clean: true,
+      configuration: "Release"
+    )
+  end
+
+  desc "Build and prepare distribution files"
+  lane :distribute do
+    build
+    generate_distribution_files
+  end
+
+  private_lane :generate_distribution_files do
+    require 'fileutils'
+
+    domain = ENV['PACER_DISTRIBUTION_DOMAIN']
+    UI.user_error!("PACER_DISTRIBUTION_DOMAIN is required") if domain.nil? || domain.empty?
+
+    version = get_version_number(xcodeproj: "Pacer.xcodeproj", target: "Pacer")
+    git_commit = `git rev-parse --short HEAD`.strip
+    base_url = "https://#{domain}/watchos"
+    dist_dir = File.expand_path("../dist", Dir.pwd)
+    FileUtils.mkdir_p(dist_dir)
+
+    # Copy app icon to dist
+    icon_src = File.expand_path("../Pacer/Assets.xcassets/AppIcon.appiconset/AppIcon.png", Dir.pwd)
+    FileUtils.cp(icon_src, "#{dist_dir}/icon.png") if File.exist?(icon_src)
+
+    # index.html — watchOS apps cannot use itms-services:// OTA install
+    html = <<~HTML
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Install Pacer</title>
+        <style>
+          body { font-family: -apple-system, sans-serif; max-width: 400px; margin: 60px auto; padding: 20px; text-align: center; }
+          .icon { width: 120px; height: 120px; border-radius: 27px; margin-bottom: 16px; }
+          h1 { font-size: 24px; margin: 0 0 8px 0; }
+          .version { color: #666; margin: 0 0 24px 0; }
+          .download { display: inline-block; background: #007aff; color: white; padding: 14px 32px; border-radius: 12px; text-decoration: none; font-weight: 600; }
+          .instructions { margin-top: 32px; text-align: left; font-size: 14px; color: #444; }
+          .instructions h2 { font-size: 16px; }
+          .instructions ol { padding-left: 20px; }
+          .instructions li { margin-bottom: 8px; }
+        </style>
+      </head>
+      <body>
+        <img src="icon.png" alt="Pacer" class="icon">
+        <h1>Pacer</h1>
+        <p class="version">Version #{version} (#{git_commit})</p>
+        <a class="download" href="Pacer.ipa">Download IPA</a>
+        <div class="instructions">
+          <h2>Installation</h2>
+          <p>Standalone watchOS apps cannot be installed via OTA. Use one of these methods:</p>
+          <ol>
+            <li><strong>Apple Configurator 2</strong> — Drag the IPA onto your paired iPhone.</li>
+            <li><strong>Xcode</strong> — Window → Devices and Simulators → select your Apple Watch → install the IPA.</li>
+            <li><strong>TestFlight</strong> — When App Store Connect is configured.</li>
+          </ol>
+        </div>
+      </body>
+      </html>
+    HTML
+    File.write("#{dist_dir}/index.html", html)
+
+    UI.success("Distribution files ready at: #{dist_dir}")
+  end
+end
